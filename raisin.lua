@@ -129,12 +129,8 @@ this.manager.run = function(dead) -- Function to execute thread management
         dead = 0 -- Set dead to 0
     end
     local cur_dead = 0 -- Set a current value for dead coroutines
+    local e = {} -- Event variable
     while true do -- Begin thread managment
-        local e = {os.pullEventRaw()} -- Pull a raw event, package it immediately
-        if e[1] == "terminate" then -- If the event is a terminate event
-            printError("Terminated") -- Print that this was terminated
-            break -- Then break out of the loop
-        end
         local s_groups = {} -- Create table for groups, sorted by priority
         s_groups[#s_groups+1] = groups[0] -- Add group 0 first
         for i = 1, #groups do -- For each group
@@ -196,6 +192,7 @@ this.manager.run = function(dead) -- Function to execute thread management
         if dead ~= 0 and cur_dead >= dead then -- If dead isn't 0 and the current dead is larger or equal to the target amount
             break -- Get out of the main loop
         end
+        e = {os.pullEventRaw()} -- Pull a raw event, package it immediately
     end
 end
 
