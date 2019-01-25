@@ -28,7 +28,7 @@ this.thread.state = function(thread, group) -- Function to get the state of a th
     assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")", 3) -- If the first argument wasn't a number
     assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")", 3) -- If the second argument wasn't a number
     assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)", 3) -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the second argument wasn't a valid thread ID
+    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the first argument wasn't a valid thread ID
     return groups[group].threads[thread].enabled -- Return the state of the thread
 end
 
@@ -37,7 +37,7 @@ this.thread.toggle = function(thread, group) -- Function to toggle the state of 
     assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")", 3) -- If the first argument wasn't a number
     assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")", 3) -- If the second argument wasn't a number
     assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)", 3) -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the second argument wasn't a valid thread ID
+    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the first argument wasn't a valid thread ID
     groups[group].threads[thread].enabled = not groups[group].threads[thread].enabled -- swap the state of the thread
     return groups[group].threads[thread].enabled -- Return the state of the thread
 end
@@ -48,7 +48,7 @@ this.thread.setPriority = function(thread, priority, group) -- Function to set t
     assert(type(priority) == "number", "Invalid argument #2 (number expected, got "..type(priority)..")", 3) -- If the second argument wasn't a number
     assert(type(group) == "number", "Invalid argument #3 (number expected, got "..type(group)..")", 3) -- If the third argument wasn't a number
     assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)", 3) -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the second argument wasn't a valid thread ID
+    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the first argument wasn't a valid thread ID
     groups[group].threads[thread].priority = priority -- Set the priority of the thread
 end
 
@@ -57,8 +57,35 @@ this.thread.getPriority = function(thread, group) -- Function to get the priorit
     assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")", 3) -- If the first argument wasn't a number
     assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")", 3) -- If the second argument wasn't a number
     assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)", 3) -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the second argument wasn't a valid thread ID
+    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the first argument wasn't a valid thread ID
     return groups[group].threads[thread].priority -- Return the priority of the thread
+end
+
+this.thread.wrap = function(thread, group) -- Function to wrap a thread and get thread functions without having to provide the thread ID
+    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")", 3) -- If the first argument wasn't a number
+    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")", 3) --If the second argument wasn't a number
+    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)", 3) -- If the second argument wasn't a valid group ID
+    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the first argument wasn't a valid thread ID
+    local wrapper = {} -- Table for inserting wrapped functions
+    for k, v in pairs(this.thread) do -- For each function in the thread library
+        if k ~= "wrap" and k ~= "add" then -- If the function we're attempting to wrap isn't this one, or the add function
+            wrapper[k] = function(priority) -- Create a replicate function
+                local stat -- Initialize a status variable
+                if k == "setPriority" then -- If the function being wrapped is the 'add' or 'setPriority function'
+                    stat = {pcall(v, thread, priority, group)} -- Grab the first argument from the parameter, then slap the group and thread ID on and pcall it all
+                else -- OTHERWISE
+                    stat = {pcall(v, thread, group)} -- slap the group and thread ID on and pcall it all
+                end
+                if stat[1] == false then -- If the pcall was unsuccessful
+                    error(stat[2]:sub(stat[2]:find(" ")+1, -1), 2) -- Spit out the error, and remove the 'raisin.lua:1##: '
+                else -- OTHERWISE
+                    table.remove(stat, 1) -- Remove whether it succeeded or not
+                    return unpack(stat) -- Return the information given by the function
+                end
+            end
+        end
+    end
+    return wrapper -- Return the wrapped functions
 end
 
 this.group.add = function(priority) -- Function to add a group
@@ -103,13 +130,13 @@ this.group.wrap = function(group) -- Function to wrap a group and get thread fun
         wrapper[k] = function(...) -- Create a replicate function
             local args = {...} -- Put all the arguments into a table
             local stat -- Initialize a status variable
-            if k == "add" or k == "setPriority" then -- If the function being wrapped is the 'add' or 'setPriority function'
-                stat = {pcall(v, args[1], args[2], group)} -- Grab the first 2 arguments from the parameters, then slap the group number on and pcall it all
+            if k == "add" or k == "setPriority" or k == "wrap" then -- If the function being wrapped is the 'add', 'setPriority', or 'wrap' function
+                stat = {pcall(v, args[1], args[2], group)} -- Grab the first 2 arguments from the parameters, then slap the group ID on and pcall it all
             else -- OTHERWISE
-                stat = {pcall(v, args[1], group)} -- Grab the first argument, then slap the group number on and pcall it all
+                stat = {pcall(v, args[1], group)} -- Grab the first argument, then slap the group ID on and pcall it all
             end
-            if not stat[1] then -- If the pcall was unsuccessful
-                error(stat[2]:sub(stat[2]:find(" ")+1, -1), 2) -- Spit out the error, and remove the 'raisin.lua:107/109: '
+            if stat[1] == false then -- If the pcall was unsuccessful
+                error(stat[2]:sub(stat[2]:find(" ")+1, -1), 2) -- Spit out the error, and remove the 'raisin.lua:1##: '
             else -- OTHERWISE
                 table.remove(stat, 1) -- Remove whether it succeeded or not
                 return unpack(stat) -- Return the information given by the function

@@ -56,6 +56,12 @@ A brief overview of the functionality of Raisin, for reference.
 - **Returns**
   - _number_: execution priority
 
+`wrap`: Wraps an entire thread so that thread based functions can easily be performed without any arguments (minus setPriority)
+- **Parameters**
+  - _number_: thread ID
+- **Returns**
+  - _table_: functions to perform thread actions
+
 ## `group`:
 
 `add`: Creates a new thread grouping container
