@@ -189,8 +189,8 @@ this.manager.run = function(dead) -- Function to execute thread management
             end
             
             for _, thread in pairs(s_threads) do -- For each sorted thread
-                if group.enabled and thread.enabled and coroutine.status(thread.coro) ~= "dead" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then -- ok we're putting this on the next line, there's a lot going on here.
-                -- If the group is enabled and the thread is enabled, and the thread isn't dead and the target event is either nil, or equal to the event detected, or equal to terminate
+                if group.enabled and thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then -- ok we're putting this on the next line, there's a lot going on here.
+                -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected, or equal to terminate
                     local event = nil -- Target event
                     while #thread.queue ~= 0 do -- until the queue is empty
                         if event == nil or event == thread.queue[1][1] then -- If the target event is nil or equal to what's in the queue
@@ -212,7 +212,7 @@ this.manager.run = function(dead) -- Function to execute thread management
                 end
                 if coroutine.status(thread.coro) == "dead" and thread.enabled ~= false then -- If the thread is dead and not disabled
                     cur_dead = cur_dead+1 -- Add one to the current dead counter
-                    thread.enabled = false -- Diable the thread
+                    thread.enabled = false -- Disable the thread
                 end
             end
         end
