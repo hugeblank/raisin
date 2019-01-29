@@ -7,17 +7,17 @@ local groups = {[0] = {threads = {}, priority = 0, enabled = true}} -- instantia
 
 local assert = function(condition, message, level) -- Local assert function that has a third parameter so that you can set the level of the error
     if not condition then -- If the condition is not met
-        error(message, level) -- Error at the level defined
+        error(message, level or 3) -- Error at the level defined or 3 as the default, one level above here
     end
 end
 
 this.thread.add = function(func, priority, group) -- Function for thread adding
     if not priority then priority = 0 end -- If there isn't a priority set it to 0
     if (not group) or 0 > group then group = 0 end -- If there isn't a group value or it's smaller than 0, assume 0
-    assert(type(func) == "function", "Invalid argument #1 (function expected, got "..type(func)..")", 3) -- If the first argument wasn't a function
-    assert(type(priority) == "number", "Invalid argument #2 (number expected, got "..type(priority)..")", 3) -- If the second argument wasn't a number
-    assert(type(group) == "number", "Invalid argument #3 (number expected, got "..type(group)..")", 3) -- If the third argument wasn't a group
-    assert(groups[group], "Invalid argument #3 (group [ID: "..group.."] does not exist)", 3) -- If the third argument was a group that doesn't exist
+    assert(type(func) == "function", "Invalid argument #1 (function expected, got "..type(func)..")") -- If the first argument wasn't a function
+    assert(type(priority) == "number", "Invalid argument #2 (number expected, got "..type(priority)..")") -- If the second argument wasn't a number
+    assert(type(group) == "number", "Invalid argument #3 (number expected, got "..type(group)..")") -- If the third argument wasn't a group
+    assert(groups[group], "Invalid argument #3 (group [ID: "..group.."] does not exist)") -- If the third argument was a group that doesn't exist
     func = coroutine.create(func) -- Create a coroutine out of the function
     groups[group].threads[#groups[group].threads+1] = {coro = func, queue = {}, priority = priority, enabled = true, event = nil} -- Create the thread object and add it to the group given
     return #groups[group].threads -- Return the thread ID
@@ -25,47 +25,47 @@ end
 
 this.thread.state = function(thread, group) -- Function to get the state of a thread
     if (not group) or 0 > group then group = 0 end -- If the group isn't defined assume it's 0
-    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")", 3) -- If the first argument wasn't a number
-    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")", 3) -- If the second argument wasn't a number
-    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)", 3) -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the first argument wasn't a valid thread ID
+    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")") -- If the first argument wasn't a number
+    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")") -- If the second argument wasn't a number
+    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)") -- If the second argument wasn't a valid group ID
+    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)") -- If the first argument wasn't a valid thread ID
     return groups[group].threads[thread].enabled -- Return the state of the thread
 end
 
 this.thread.toggle = function(thread, group) -- Function to toggle the state of a thread
     if (not group) or 0 > group then group = 0 end -- If the group isn't defined assume it's 0
-    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")", 3) -- If the first argument wasn't a number
-    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")", 3) -- If the second argument wasn't a number
-    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)", 3) -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the first argument wasn't a valid thread ID
+    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")") -- If the first argument wasn't a number
+    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")") -- If the second argument wasn't a number
+    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)") -- If the second argument wasn't a valid group ID
+    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)") -- If the first argument wasn't a valid thread ID
     groups[group].threads[thread].enabled = not groups[group].threads[thread].enabled -- swap the state of the thread
     return groups[group].threads[thread].enabled -- Return the state of the thread
 end
 
 this.thread.setPriority = function(thread, priority, group) -- Function to set the priority of a thread
     if (not group) or 0 > group then group = 0 end -- If the group isn't defined assume it's 0
-    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")", 3) -- If the first argument wasn't a number
-    assert(type(priority) == "number", "Invalid argument #2 (number expected, got "..type(priority)..")", 3) -- If the second argument wasn't a number
-    assert(type(group) == "number", "Invalid argument #3 (number expected, got "..type(group)..")", 3) -- If the third argument wasn't a number
-    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)", 3) -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the first argument wasn't a valid thread ID
+    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")") -- If the first argument wasn't a number
+    assert(type(priority) == "number", "Invalid argument #2 (number expected, got "..type(priority)..")") -- If the second argument wasn't a number
+    assert(type(group) == "number", "Invalid argument #3 (number expected, got "..type(group)..")") -- If the third argument wasn't a number
+    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)") -- If the second argument wasn't a valid group ID
+    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)") -- If the first argument wasn't a valid thread ID
     groups[group].threads[thread].priority = priority -- Set the priority of the thread
 end
 
 this.thread.getPriority = function(thread, group) -- Function to get the priority of a thread
     if (not group) or 0 > group then group = 0 end -- If the group isn't defined assume it's 0
-    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")", 3) -- If the first argument wasn't a number
-    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")", 3) -- If the second argument wasn't a number
-    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)", 3) -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the first argument wasn't a valid thread ID
+    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")") -- If the first argument wasn't a number
+    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")") -- If the second argument wasn't a number
+    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)") -- If the second argument wasn't a valid group ID
+    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)") -- If the first argument wasn't a valid thread ID
     return groups[group].threads[thread].priority -- Return the priority of the thread
 end
 
 this.thread.wrap = function(thread, group) -- Function to wrap a thread and get thread functions without having to provide the thread ID
-    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")", 3) -- If the first argument wasn't a number
-    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")", 3) --If the second argument wasn't a number
-    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)", 3) -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)", 3) -- If the first argument wasn't a valid thread ID
+    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")") -- If the first argument wasn't a number
+    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")") --If the second argument wasn't a number
+    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)") -- If the second argument wasn't a valid group ID
+    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)") -- If the first argument wasn't a valid thread ID
     local wrapper = {} -- Table for inserting wrapped functions
     for k, v in pairs(this.thread) do -- For each function in the thread library
         if k ~= "wrap" and k ~= "add" then -- If the function we're attempting to wrap isn't this one, or the add function
@@ -89,42 +89,42 @@ this.thread.wrap = function(thread, group) -- Function to wrap a thread and get 
 end
 
 this.group.add = function(priority) -- Function to add a group
-    assert(type(priority) == "number", "Invalid argument #1 (number expected, got "..type(priority)..")", 3) -- If the first argument wasn't a number
+    assert(type(priority) == "number", "Invalid argument #1 (number expected, got "..type(priority)..")") -- If the first argument wasn't a number
     assert(priority > 0, "Invalid argument #1 (priority should be greater than 0)") -- If the priority is less than 0
     groups[#groups+1] = {threads = {}, priority = priority, enabled = true} -- Create the group object
     return #groups -- Return the group ID
 end
 
 this.group.toggle = function(group) -- Function to toggle the state of an entire group
-    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")", 3) -- If the first argument wasn't a number
-    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)", 3) -- If the first argument wasn't a valid group ID
+    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")") -- If the first argument wasn't a number
+    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)") -- If the first argument wasn't a valid group ID
     groups[group].enabled = not groups[group].enabled -- Toggle the state of the group
     return groups[group].enabled -- Return the state of the group
 end
 
 this.group.state = function(group) -- Function to get the state of an entire group
-    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")", 3) -- If the first argument wasn't a number
-    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)", 3) -- If the first argument wasn't a valid group ID
+    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")") -- If the first argument wasn't a number
+    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)") -- If the first argument wasn't a valid group ID
     return groups[group].enabled -- Return the state of the group
 end
 
 this.group.setPriority = function(priority, group) -- Function to set the priority of an entire group
-    assert(type(priority) == "number", "Invalid argument #1 (number expected, got "..type(priority)..")", 3) -- If the first argument wasn't a number
+    assert(type(priority) == "number", "Invalid argument #1 (number expected, got "..type(priority)..")") -- If the first argument wasn't a number
     assert(priority > 0, "Invalid argument #1 (priority should be greater than 0)") -- If the first argument wasn't greater than 0
-    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")", 3) -- If the second argument wasn't a number
-    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)", 3) -- If the second argument wasn't a valid group ID
+    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")") -- If the second argument wasn't a number
+    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)") -- If the second argument wasn't a valid group ID
     groups[group].priority = priority -- Set the priority of the group
 end
 
 this.group.getPriority = function(group) -- Function to get the priority of an entire group
-    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")", 3) -- If the first argument wasn't a number
-    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)", 3) -- If the first argument wasn't a valid group ID
+    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")") -- If the first argument wasn't a number
+    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)") -- If the first argument wasn't a valid group ID
     return groups[group].priority -- Return the priority of the group
 end
 
 this.group.wrap = function(group) -- Function to wrap a group and get thread functions like those in the thread library
-    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")", 3) -- If the first argument wasn't a number
-    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)", 3) -- If the first argument wasn't a valid group ID
+    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")") -- If the first argument wasn't a number
+    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)") -- If the first argument wasn't a valid group ID
     local wrapper = {} -- Table for inserting wrapped functions
     for k, v in pairs(this.thread) do -- For each function in the thread library
         wrapper[k] = function(...) -- Create a replicate function
@@ -148,7 +148,7 @@ end
 
 this.manager.run = function(dead) -- Function to execute thread management
     if dead ~= nil then -- If dead is something
-        assert(type(dead) == "number", "Invalid argument #1 (number expected, got "..type(dead)..")", 3) -- If the first argument wasn't a number
+        assert(type(dead) == "number", "Invalid argument #1 (number expected, got "..type(dead)..")") -- If the first argument wasn't a number
         if dead < 0 then -- If dead is a negative number
             dead = 0 -- Set dead to 0
         end
@@ -198,7 +198,7 @@ this.manager.run = function(dead) -- Function to execute thread management
                             if suc then -- If execution was successful
                                 event = err -- The target event is set to the err value
                             end
-                            assert(suc, err, 3) -- If the coroutine wasn't successful, error
+                            assert(suc, err) -- If the coroutine wasn't successful, error
                         end
                         table.remove(thread.queue, 1) -- Remove the event from the queue
                     end
@@ -206,7 +206,7 @@ this.manager.run = function(dead) -- Function to execute thread management
                     if suc then -- If that was successful
                         thread.event = err -- set the event the thread desires next
                     end
-                    assert(suc, err, 3) -- If it was unsuccessful throw the error
+                    assert(suc, err) -- If it was unsuccessful throw the error
                 elseif not (thread.enabled or coroutine.status(thread.coro) ~= "dead") then -- OTHERWISE if the thread isn't enabled and isn't dead add the event to the thread queue
                     thread.queue[#thread.queue+1] = e
                 end
