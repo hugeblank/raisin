@@ -160,19 +160,22 @@ this.manager.runGroup = function(group, dead) -- Function to execute thread mana
     local cur_dead = 0 -- Set a current value for dead coroutines
     local e = {} -- Event variable
     while true do -- Begin thread managment
-        local s_groups = {} -- Create table for groups, sorted by priority
-        s_groups[#s_groups+1] = groups[0] -- Add group 0 first
-        for i = 1, #groups do -- For each group
-            for j = 1, #s_groups do -- Iterate over the sorted groups
-                if groups[i].priority < s_groups[j].priority then -- If the priority of the current unsorted group is less than the value of the current sorted group
-                    table.insert(s_groups, j, groups[i]) -- Insert it such that it will go before the sorted group in the sorted table
-                    break -- Break out of the checking
-                elseif j == #s_groups then -- OTHERWISE if this is the last iteration
-                    s_groups[#s_groups+1] = groups[i] -- Tack the unsorted group onto the end of the sorted table
+        if groups[group].enabled then
+            local threads = groups[group].threads -- Make the current groups threads more accessible
+            local s_threads = {} -- Sort threads
+            if #threads > 0 then -- If there is at least one thread
+                s_threads[#s_threads+1] = threads[1] -- Allocate the first thread to teh sorted table
+                for i = 2, #threads do -- For each thread other than that one
+                    for j = 1, #s_threads do -- Scan the sorted table
+                        if threads[i].priority < s_threads[j].priority then -- If the priority of the current unsorted thread is less than the value of the current sorted thread
+                            table.insert(s_threads, j, threads[i]) -- Insert it such that it will go before the sorted thread in the sorted table
+                            break -- Break out of checking
+                        elseif j == #s_threads then -- OTHERWISE if this is the last iteration
+                            s_threads[#s_threads+1] = threads[i] -- Take the unsorted thread onto the end of the sorted table
+                        end
+                    end
                 end
             end
-        end
-        if groups[group].enabled then
             for _, thread in pairs(s_threads) do -- For each sorted thread
                 if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then -- ok we're putting this on the next line, there's a lot going on here.
                 -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected, or equal to terminate
@@ -233,7 +236,6 @@ this.manager.run = function(dead) -- Function to execute thread management
                 end
             end
         end
-
         for _, group in pairs(s_groups) do -- For each group
             local threads = group.threads -- Make the current groups threads more accessible
             local s_threads = {} -- Sort threads
