@@ -146,6 +146,69 @@ this.group.wrap = function(group) -- Function to wrap a group and get thread fun
     return wrapper -- Return the wrapped functions
 end
 
+this.manager.runGroup = function(group, dead) -- Function to execute thread management
+    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")") -- If the first argument wasn't a number
+    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)") -- If the first argument wasn't a valid group ID
+    if dead ~= nil then -- If dead is something
+        assert(type(dead) == "number", "Invalid argument #1 (number expected, got "..type(dead)..")") -- If the first argument wasn't a number
+        if dead < 0 then -- If dead is a negative number
+            dead = 0 -- Set dead to 0
+        end
+    else -- OTHERWISE
+        dead = 0 -- Set dead to 0
+    end
+    local cur_dead = 0 -- Set a current value for dead coroutines
+    local e = {} -- Event variable
+    while true do -- Begin thread managment
+        local s_groups = {} -- Create table for groups, sorted by priority
+        s_groups[#s_groups+1] = groups[0] -- Add group 0 first
+        for i = 1, #groups do -- For each group
+            for j = 1, #s_groups do -- Iterate over the sorted groups
+                if groups[i].priority < s_groups[j].priority then -- If the priority of the current unsorted group is less than the value of the current sorted group
+                    table.insert(s_groups, j, groups[i]) -- Insert it such that it will go before the sorted group in the sorted table
+                    break -- Break out of the checking
+                elseif j == #s_groups then -- OTHERWISE if this is the last iteration
+                    s_groups[#s_groups+1] = groups[i] -- Tack the unsorted group onto the end of the sorted table
+                end
+            end
+        end
+        if groups[group].enabled then
+            for _, thread in pairs(s_threads) do -- For each sorted thread
+                if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then -- ok we're putting this on the next line, there's a lot going on here.
+                -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected, or equal to terminate
+                    local event = nil -- Target event
+                    while #thread.queue ~= 0 do -- until the queue is empty
+                        if event == nil or event == thread.queue[1][1] then -- If the target event is nil or equal to what's in the queue
+                            local suc, err = coroutine.resume(thread.coro, unpack(thread.queue[1])) -- Resume the coroutine, and give the event
+                            if suc then -- If execution was successful
+                                event = err -- The target event is set to the err value
+                            end
+                            assert(suc, err) -- If the coroutine wasn't successful, error
+                        end
+                        table.remove(thread.queue, 1) -- Remove the event from the queue
+                    end
+                    local suc, err = coroutine.resume(thread.coro, unpack(e)) -- Resume the coroutine with the current event
+                    if suc then -- If that was successful
+                        thread.event = err -- set the event the thread desires next
+                    end
+                    assert(suc, err) -- If it was unsuccessful throw the error
+                elseif not (thread.enabled or coroutine.status(thread.coro) ~= "dead") then -- OTHERWISE if the thread isn't enabled and isn't dead add the event to the thread queue
+                    thread.queue[#thread.queue+1] = e
+                end
+                if coroutine.status(thread.coro) == "dead" and thread.enabled ~= false then -- If the thread is dead and not disabled
+                    cur_dead = cur_dead+1 -- Add one to the current dead counter
+                    thread.enabled = false -- Disable the thread
+                end
+            end
+        end
+        if dead ~= 0 and cur_dead >= dead then -- If dead isn't 0 and the current dead is larger or equal to the target amount
+            break -- Get out of the main loop
+        end
+        e = {os.pullEventRaw()} -- Pull a raw event, package it immediately
+    end
+    groups[group].enabled = false
+end
+
 this.manager.run = function(dead) -- Function to execute thread management
     if dead ~= nil then -- If dead is something
         assert(type(dead) == "number", "Invalid argument #1 (number expected, got "..type(dead)..")") -- If the first argument wasn't a number
@@ -187,32 +250,33 @@ this.manager.run = function(dead) -- Function to execute thread management
                     end
                 end
             end
-            
-            for _, thread in pairs(s_threads) do -- For each sorted thread
-                if group.enabled and thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then -- ok we're putting this on the next line, there's a lot going on here.
-                -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected, or equal to terminate
-                    local event = nil -- Target event
-                    while #thread.queue ~= 0 do -- until the queue is empty
-                        if event == nil or event == thread.queue[1][1] then -- If the target event is nil or equal to what's in the queue
-                            local suc, err = coroutine.resume(thread.coro, unpack(thread.queue[1])) -- Resume the coroutine, and give the event
-                            if suc then -- If execution was successful
-                                event = err -- The target event is set to the err value
+            if group.enabled then
+                for _, thread in pairs(s_threads) do -- For each sorted thread
+                    if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then -- ok we're putting this on the next line, there's a lot going on here.
+                    -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected, or equal to terminate
+                        local event = nil -- Target event
+                        while #thread.queue ~= 0 do -- until the queue is empty
+                            if event == nil or event == thread.queue[1][1] then -- If the target event is nil or equal to what's in the queue
+                                local suc, err = coroutine.resume(thread.coro, unpack(thread.queue[1])) -- Resume the coroutine, and give the event
+                                if suc then -- If execution was successful
+                                    event = err -- The target event is set to the err value
+                                end
+                                assert(suc, err) -- If the coroutine wasn't successful, error
                             end
-                            assert(suc, err) -- If the coroutine wasn't successful, error
+                            table.remove(thread.queue, 1) -- Remove the event from the queue
                         end
-                        table.remove(thread.queue, 1) -- Remove the event from the queue
+                        local suc, err = coroutine.resume(thread.coro, unpack(e)) -- Resume the coroutine with the current event
+                        if suc then -- If that was successful
+                            thread.event = err -- set the event the thread desires next
+                        end
+                        assert(suc, err) -- If it was unsuccessful throw the error
+                    elseif not (thread.enabled or coroutine.status(thread.coro) ~= "dead") then -- OTHERWISE if the thread isn't enabled and isn't dead add the event to the thread queue
+                        thread.queue[#thread.queue+1] = e
                     end
-                    local suc, err = coroutine.resume(thread.coro, unpack(e)) -- Resume the coroutine with the current event
-                    if suc then -- If that was successful
-                        thread.event = err -- set the event the thread desires next
+                    if coroutine.status(thread.coro) == "dead" and thread.enabled ~= false then -- If the thread is dead and not disabled
+                        cur_dead = cur_dead+1 -- Add one to the current dead counter
+                        thread.enabled = false -- Disable the thread
                     end
-                    assert(suc, err) -- If it was unsuccessful throw the error
-                elseif not (thread.enabled or coroutine.status(thread.coro) ~= "dead") then -- OTHERWISE if the thread isn't enabled and isn't dead add the event to the thread queue
-                    thread.queue[#thread.queue+1] = e
-                end
-                if coroutine.status(thread.coro) == "dead" and thread.enabled ~= false then -- If the thread is dead and not disabled
-                    cur_dead = cur_dead+1 -- Add one to the current dead counter
-                    thread.enabled = false -- Disable the thread
                 end
             end
         end
