@@ -7,7 +7,10 @@ local groups = {[0] = {threads = {}, priority = 0, enabled = true}} -- instantia
 
 local assert = function(condition, message, level) -- Local assert function that has a third parameter so that you can set the level of the error
     if not condition then -- If the condition is not met
-        error(message, level or 3) -- Error at the level defined or 3 as the default, one level above here
+        if not level then
+            level = 0
+        end
+        error(message, 3+level) -- Error at the level defined or 3 as the default, one level above here
     end
 end
 
@@ -71,7 +74,7 @@ this.thread.wrap = function(thread, group) -- Function to wrap a thread and get 
         if k ~= "wrap" and k ~= "add" then -- If the function we're attempting to wrap isn't this one, or the add function
             wrapper[k] = function(priority) -- Create a replicate function
                 local stat -- Initialize a status variable
-                if k == "setPriority" then -- If the function being wrapped is the 'add' or 'setPriority function'
+                if k == "setPriority" then -- If the function being wrapped is the 'setPriority function'
                     stat = {pcall(v, thread, priority, group)} -- Grab the first argument from the parameter, then slap the group and thread ID on and pcall it all
                 else -- OTHERWISE
                     stat = {pcall(v, thread, group)} -- slap the group and thread ID on and pcall it all
@@ -146,87 +149,27 @@ this.group.wrap = function(group) -- Function to wrap a group and get thread fun
     return wrapper -- Return the wrapped functions
 end
 
-this.manager.runGroup = function(group, dead) -- Function to execute thread management
-    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")") -- If the first argument wasn't a number
-    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)") -- If the first argument wasn't a valid group ID
+local runInternal = function(groups, dead) -- Function to execute thread management
     if dead ~= nil then -- If dead is something
-        assert(type(dead) == "number", "Invalid argument #1 (number expected, got "..type(dead)..")") -- If the first argument wasn't a number
+        assert(type(dead) == "number", "Invalid argument #1 (number expected, got "..type(dead)..")", 1) -- If the first argument wasn't a number
         if dead < 0 then -- If dead is a negative number
             dead = 0 -- Set dead to 0
         end
     else -- OTHERWISE
         dead = 0 -- Set dead to 0
     end
-    local cur_dead = 0 -- Set a current value for dead coroutines
-    local e = {} -- Event variable
-    while true do -- Begin thread managment
-        if groups[group].enabled then
-            local threads = groups[group].threads -- Make the current groups threads more accessible
-            local s_threads = {} -- Sort threads
-            if #threads > 0 then -- If there is at least one thread
-                s_threads[#s_threads+1] = threads[1] -- Allocate the first thread to teh sorted table
-                for i = 2, #threads do -- For each thread other than that one
-                    for j = 1, #s_threads do -- Scan the sorted table
-                        if threads[i].priority < s_threads[j].priority then -- If the priority of the current unsorted thread is less than the value of the current sorted thread
-                            table.insert(s_threads, j, threads[i]) -- Insert it such that it will go before the sorted thread in the sorted table
-                            break -- Break out of checking
-                        elseif j == #s_threads then -- OTHERWISE if this is the last iteration
-                            s_threads[#s_threads+1] = threads[i] -- Take the unsorted thread onto the end of the sorted table
-                        end
-                    end
-                end
-            end
-            for _, thread in pairs(s_threads) do -- For each sorted thread
-                if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then -- ok we're putting this on the next line, there's a lot going on here.
-                -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected, or equal to terminate
-                    local event = nil -- Target event
-                    while #thread.queue ~= 0 do -- until the queue is empty
-                        if event == nil or event == thread.queue[1][1] then -- If the target event is nil or equal to what's in the queue
-                            local suc, err = coroutine.resume(thread.coro, unpack(thread.queue[1])) -- Resume the coroutine, and give the event
-                            if suc then -- If execution was successful
-                                event = err -- The target event is set to the err value
-                            end
-                            assert(suc, err) -- If the coroutine wasn't successful, error
-                        end
-                        table.remove(thread.queue, 1) -- Remove the event from the queue
-                    end
-                    local suc, err = coroutine.resume(thread.coro, unpack(e)) -- Resume the coroutine with the current event
-                    if suc then -- If that was successful
-                        thread.event = err -- set the event the thread desires next
-                    end
-                    assert(suc, err) -- If it was unsuccessful throw the error
-                elseif not (thread.enabled or coroutine.status(thread.coro) ~= "dead") then -- OTHERWISE if the thread isn't enabled and isn't dead add the event to the thread queue
-                    thread.queue[#thread.queue+1] = e
-                end
-                if coroutine.status(thread.coro) == "dead" and thread.enabled ~= false then -- If the thread is dead and not disabled
-                    cur_dead = cur_dead+1 -- Add one to the current dead counter
-                    thread.enabled = false -- Disable the thread
-                end
-            end
-        end
-        if dead ~= 0 and cur_dead >= dead then -- If dead isn't 0 and the current dead is larger or equal to the target amount
-            break -- Get out of the main loop
-        end
-        e = {os.pullEventRaw()} -- Pull a raw event, package it immediately
-    end
-    groups[group].enabled = false
-end
 
-this.manager.run = function(dead) -- Function to execute thread management
-    if dead ~= nil then -- If dead is something
-        assert(type(dead) == "number", "Invalid argument #1 (number expected, got "..type(dead)..")") -- If the first argument wasn't a number
-        if dead < 0 then -- If dead is a negative number
-            dead = 0 -- Set dead to 0
-        end
-    else -- OTHERWISE
-        dead = 0 -- Set dead to 0
-    end
     local cur_dead = 0 -- Set a current value for dead coroutines
     local e = {} -- Event variable
-    while true do -- Begin thread managment
-        local s_groups = {} -- Create table for groups, sorted by priority
-        s_groups[#s_groups+1] = groups[0] -- Add group 0 first
+    while true do -- Begin thread management
+        local internal_dead = 0 -- Set a value to update per loop so added threads that immediately die aren't factored
         for i = 1, #groups do -- For each group
+            internal_dead = internal_dead+#groups[i].threads -- Add the amount of threads in the group to the dead counter
+        end
+        internal_dead = internal_dead-dead -- Subtract the input 
+        local s_groups = {} -- Create table for groups, sorted by priority
+        s_groups[#s_groups+1] = groups[1] -- Add the first group to start sorting
+        for i = 2, #groups do -- For each group other than that one
             for j = 1, #s_groups do -- Iterate over the sorted groups
                 if groups[i].priority < s_groups[j].priority then -- If the priority of the current unsorted group is less than the value of the current sorted group
                     table.insert(s_groups, j, groups[i]) -- Insert it such that it will go before the sorted group in the sorted table
@@ -252,7 +195,7 @@ this.manager.run = function(dead) -- Function to execute thread management
                     end
                 end
             end
-            if group.enabled then
+            if group.enabled then -- If the group is enabled
                 for _, thread in pairs(s_threads) do -- For each sorted thread
                     if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then -- ok we're putting this on the next line, there's a lot going on here.
                     -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected, or equal to terminate
@@ -282,11 +225,27 @@ this.manager.run = function(dead) -- Function to execute thread management
                 end
             end
         end
-        if dead ~= 0 and cur_dead >= dead then -- If dead isn't 0 and the current dead is larger or equal to the target amount
+        if cur_dead >= internal_dead then -- If dead isn't 0 and the current dead is larger or equal to the target amount
             break -- Get out of the main loop
         end
         e = {os.pullEventRaw()} -- Pull a raw event, package it immediately
     end
+end
+
+this.manager.runGroup = function(group, dead) -- Function to execute thread management for a single group
+    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")") -- If the first argument wasn't a number
+    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)") -- If the first argument wasn't a valid group ID
+    res = runInternal({groups[group]}, dead)
+    groups[group].enabled = false
+    return res
+end
+
+this.manager.run = function(dead) -- Function to execute thread management for all groups
+    local grps = {}
+    for i = 0, #groups do
+        grps[i+1] = groups[i]
+    end
+    return runInternal(grps, dead)
 end
 
 return this -- Return the API
