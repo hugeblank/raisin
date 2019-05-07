@@ -150,9 +150,10 @@ local runInternal = function(groups, dead) -- Function to execute thread managem
 end
 
 this.manager.runGroup = function(group, dead) -- Function to execute thread management for a single group
-    assert(isgroup(group), "Invalid argument #1 (valid group expected)")
+    group = isgroup(group)
+    assert(group, "Invalid argument #1 (valid group expected)")
     res = runInternal({group}, dead)
-    groups[group].enabled = false
+    group.enabled = false
     return res
 end
 
