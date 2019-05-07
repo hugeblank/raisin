@@ -1,227 +1,144 @@
-local this = {} -- is Raisin, the genius thread manager by hugeblank.
-this.group = {} -- of code is my property, but I will let you use it so long as you don't try and redistribute
-this.thread = {} -- manager for monetary gain and keep the three lines above, and one below in tact. Add/remove code as you wish, should you decide to freely distribute with additional modifications credit yourself, btw.
-this.manager = {} -- can be found on github at `https://github.com/hugeblank/raisin`, and demonstrations of the program can be found here: https://github.com/hugeblank/raisin-demos
+--[[ Raisin by Hugeblank
+    This code is my property, but I will let you use it so long as you don't redistribute this manager for
+    monetary gain and leave this comment block untouched. Add/remove code as you wish. Should you decide to freely
+    distribute with additional modifications, please credit yourself. :)
+    
+    Raisin can be found on github at:
+    `https://github.com/hugeblank/raisin`
 
-local groups = {[0] = {threads = {}, priority = 0, enabled = true}} -- instantiate the groups table, the mother of Raisin. Add the master thread in
+    Demonstrations of the library can also be found at:
+    `https://github.com/hugeblank/raisin-demos`
+]]
+
+local this = {}
+this.manager = {} 
+
+local groups = {} -- instantiate the groups table, the mother of Raisin.
 
 local assert = function(condition, message, level) -- Local assert function that has a third parameter so that you can set the level of the error
     if not condition then -- If the condition is not met
-        if not level then
-            level = 0
-        end
+        level = level or 0
         error(message, 3+level) -- Error at the level defined or 3 as the default, one level above here
     end
 end
 
-this.thread.add = function(func, priority, group) -- Function for thread adding
-    if not priority then priority = 0 end -- If there isn't a priority set it to 0
-    if (not group) or 0 > group then group = 0 end -- If there isn't a group value or it's smaller than 0, assume 0
-    assert(type(func) == "function", "Invalid argument #1 (function expected, got "..type(func)..")") -- If the first argument wasn't a function
-    assert(type(priority) == "number", "Invalid argument #2 (number expected, got "..type(priority)..")") -- If the second argument wasn't a number
-    assert(type(group) == "number", "Invalid argument #3 (number expected, got "..type(group)..")") -- If the third argument wasn't a group
-    assert(groups[group], "Invalid argument #3 (group [ID: "..group.."] does not exist)") -- If the third argument was a group that doesn't exist
+local isgroup = function(group)
+    for i = 1, #groups do
+        if group == groups[i].instance then
+            return groups[i]
+        end
+    end
+    return false
+end
+
+local interface = function(internal)
+    return {
+        state = function()
+            return internal.enabled
+        end,
+        toggle = function(value)
+            internal.enabled = value or not internal.enabled
+        end,
+        getPriority = function()
+            return internal.priority
+        end,
+        setPriority = function(value)
+            assert(type(value) == "number", "Invalid argument #1 (number expected, got "..type(value)..")")
+            internal.priority = value
+        end
+    }
+end
+
+this.group = function(priority)
+    priority = priority or 0
+    local internal = {threads = {}, priority = priority, enabled = true}
+    internal.instance = interface(internal)
+    groups[#groups+1] = internal
+    return internal.instance
+end
+
+this.thread = function(func, priority, group) -- Function for thread adding
+    priority = priority or 0
+    group = isgroup(group or groups[1].instance)
+    assert(type(func) == "function", "Invalid argument #1 (function expected, got "..type(func)..")")
+    assert(type(priority) == "number", "Invalid argument #2 (number expected, got "..type(priority)..")")
+    assert(group, "Invalid argument #3 (valid group expected)")
     func = coroutine.create(func) -- Create a coroutine out of the function
-    groups[group].threads[#groups[group].threads+1] = {coro = func, queue = {}, priority = priority, enabled = true, event = nil} -- Create the thread object and add it to the group given
-    return #groups[group].threads -- Return the thread ID
-end
-
-this.thread.state = function(thread, group) -- Function to get the state of a thread
-    if (not group) or 0 > group then group = 0 end -- If the group isn't defined assume it's 0
-    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")") -- If the first argument wasn't a number
-    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")") -- If the second argument wasn't a number
-    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)") -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)") -- If the first argument wasn't a valid thread ID
-    return groups[group].threads[thread].enabled -- Return the state of the thread
-end
-
-this.thread.toggle = function(thread, group) -- Function to toggle the state of a thread
-    if (not group) or 0 > group then group = 0 end -- If the group isn't defined assume it's 0
-    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")") -- If the first argument wasn't a number
-    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")") -- If the second argument wasn't a number
-    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)") -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)") -- If the first argument wasn't a valid thread ID
-    groups[group].threads[thread].enabled = not groups[group].threads[thread].enabled -- swap the state of the thread
-    return groups[group].threads[thread].enabled -- Return the state of the thread
-end
-
-this.thread.setPriority = function(thread, priority, group) -- Function to set the priority of a thread
-    if (not group) or 0 > group then group = 0 end -- If the group isn't defined assume it's 0
-    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")") -- If the first argument wasn't a number
-    assert(type(priority) == "number", "Invalid argument #2 (number expected, got "..type(priority)..")") -- If the second argument wasn't a number
-    assert(type(group) == "number", "Invalid argument #3 (number expected, got "..type(group)..")") -- If the third argument wasn't a number
-    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)") -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)") -- If the first argument wasn't a valid thread ID
-    groups[group].threads[thread].priority = priority -- Set the priority of the thread
-end
-
-this.thread.getPriority = function(thread, group) -- Function to get the priority of a thread
-    if (not group) or 0 > group then group = 0 end -- If the group isn't defined assume it's 0
-    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")") -- If the first argument wasn't a number
-    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")") -- If the second argument wasn't a number
-    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)") -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)") -- If the first argument wasn't a valid thread ID
-    return groups[group].threads[thread].priority -- Return the priority of the thread
-end
-
-this.thread.wrap = function(thread, group) -- Function to wrap a thread and get thread functions without having to provide the thread ID
-    assert(type(thread) == "number", "Invalid argument #1 (number expected, got "..type(thread)..")") -- If the first argument wasn't a number
-    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")") --If the second argument wasn't a number
-    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)") -- If the second argument wasn't a valid group ID
-    assert(groups[group].threads[thread], "Invalid argument #1 (thread [ID: "..thread.."] does not exist)") -- If the first argument wasn't a valid thread ID
-    local wrapper = {} -- Table for inserting wrapped functions
-    for k, v in pairs(this.thread) do -- For each function in the thread library
-        if k ~= "wrap" and k ~= "add" then -- If the function we're attempting to wrap isn't this one, or the add function
-            wrapper[k] = function(priority) -- Create a replicate function
-                local stat -- Initialize a status variable
-                if k == "setPriority" then -- If the function being wrapped is the 'setPriority function'
-                    stat = {pcall(v, thread, priority, group)} -- Grab the first argument from the parameter, then slap the group and thread ID on and pcall it all
-                else -- OTHERWISE
-                    stat = {pcall(v, thread, group)} -- slap the group and thread ID on and pcall it all
-                end
-                if stat[1] == false then -- If the pcall was unsuccessful
-                    error(stat[2]:sub(stat[2]:find(" ")+1, -1), 2) -- Spit out the error, and remove the 'raisin.lua:1##: '
-                else -- OTHERWISE
-                    table.remove(stat, 1) -- Remove whether it succeeded or not
-                    return unpack(stat) -- Return the information given by the function
-                end
-            end
-        end
-    end
-    return wrapper -- Return the wrapped functions
-end
-
-this.group.add = function(priority) -- Function to add a group
-    assert(type(priority) == "number", "Invalid argument #1 (number expected, got "..type(priority)..")") -- If the first argument wasn't a number
-    assert(priority > 0, "Invalid argument #1 (priority should be greater than 0)") -- If the priority is less than 0
-    groups[#groups+1] = {threads = {}, priority = priority, enabled = true} -- Create the group object
-    return #groups -- Return the group ID
-end
-
-this.group.toggle = function(group) -- Function to toggle the state of an entire group
-    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")") -- If the first argument wasn't a number
-    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)") -- If the first argument wasn't a valid group ID
-    groups[group].enabled = not groups[group].enabled -- Toggle the state of the group
-    return groups[group].enabled -- Return the state of the group
-end
-
-this.group.state = function(group) -- Function to get the state of an entire group
-    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")") -- If the first argument wasn't a number
-    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)") -- If the first argument wasn't a valid group ID
-    return groups[group].enabled -- Return the state of the group
-end
-
-this.group.setPriority = function(priority, group) -- Function to set the priority of an entire group
-    assert(type(priority) == "number", "Invalid argument #1 (number expected, got "..type(priority)..")") -- If the first argument wasn't a number
-    assert(priority > 0, "Invalid argument #1 (priority should be greater than 0)") -- If the first argument wasn't greater than 0
-    assert(type(group) == "number", "Invalid argument #2 (number expected, got "..type(group)..")") -- If the second argument wasn't a number
-    assert(groups[group], "Invalid argument #2 (group [ID: "..group.."] does not exist)") -- If the second argument wasn't a valid group ID
-    groups[group].priority = priority -- Set the priority of the group
-end
-
-this.group.getPriority = function(group) -- Function to get the priority of an entire group
-    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")") -- If the first argument wasn't a number
-    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)") -- If the first argument wasn't a valid group ID
-    return groups[group].priority -- Return the priority of the group
-end
-
-this.group.wrap = function(group) -- Function to wrap a group and get thread functions like those in the thread library
-    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")") -- If the first argument wasn't a number
-    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)") -- If the first argument wasn't a valid group ID
-    local wrapper = {} -- Table for inserting wrapped functions
-    for k, v in pairs(this.thread) do -- For each function in the thread library
-        wrapper[k] = function(...) -- Create a replicate function
-            local args = {...} -- Put all the arguments into a table
-            local stat -- Initialize a status variable
-            if k == "add" or k == "setPriority" or k == "wrap" then -- If the function being wrapped is the 'add', 'setPriority', or 'wrap' function
-                stat = {pcall(v, args[1], args[2], group)} -- Grab the first 2 arguments from the parameters, then slap the group ID on and pcall it all
-            else -- OTHERWISE
-                stat = {pcall(v, args[1], group)} -- Grab the first argument, then slap the group ID on and pcall it all
-            end
-            if stat[1] == false then -- If the pcall was unsuccessful
-                error(stat[2]:sub(stat[2]:find(" ")+1, -1), 2) -- Spit out the error, and remove the 'raisin.lua:1##: '
-            else -- OTHERWISE
-                table.remove(stat, 1) -- Remove whether it succeeded or not
-                return unpack(stat) -- Return the information given by the function
-            end
-        end
-    end
-    return wrapper -- Return the wrapped functions
+    local internal = {coro = func, queue = {}, priority = priority, enabled = true, event = nil}
+    internal.instance = interface(internal)
+    group.threads[#group.threads+1] = internal
+    return internal.instance
 end
 
 local runInternal = function(groups, dead) -- Function to execute thread management
-    if dead ~= nil then -- If dead is something
-        assert(type(dead) == "number", "Invalid argument #1 (number expected, got "..type(dead)..")", 1) -- If the first argument wasn't a number
-        if dead < 0 then -- If dead is a negative number
-            dead = 0 -- Set dead to 0
-        end
-    else -- OTHERWISE
-        dead = 0 -- Set dead to 0
+    assert(dead == nil or type(dead) == "number", "Invalid argument #1 (number expected, got "..type(dead)..")", 1)
+    if not dead or dead < 0 then
+        dead = 0
     end
-
     local cur_dead = 0 -- Set a current value for dead coroutines
+    local function sort(unsorted)
+        local sorted = {}
+        sorted[#sorted+1] = unsorted[1] -- Add the first item to start sorting
+        for i = 2, #unsorted do -- For each item other than that one
+            for j = 1, #sorted do -- Iterate over the sorted list
+                if unsorted[i].priority < sorted[j].priority then -- If the priority of the current unsorted item is less than the value of the current sorted item
+                    table.insert(sorted, j, unsorted[i]) -- Insert it such that it will go before the sorted item in the sorted table
+                    break -- Break out of the checking
+                elseif j == #sorted then -- OTHERWISE if this is the last iteration
+                    sorted[#sorted+1] = unsorted[i] -- Tack the unsorted item onto the end of the sorted table
+                end
+            end
+        end
+        return sorted
+    end
+    local function resume(coro, event)
+        local suc, err = coroutine.resume(coro, table.unpack(event))
+        assert(suc, err, 1)
+        if suc then
+            return err    
+        end
+    end
     local e = {} -- Event variable
     while true do -- Begin thread management
         local internal_dead = 0 -- Set a value to update per loop so added threads that immediately die aren't factored
         for i = 1, #groups do -- For each group
-            internal_dead = internal_dead+#groups[i].threads -- Add the amount of threads in the group to the dead counter
+            internal_dead = internal_dead+#groups[i].threads -- Add the amount of threads in the group(s) to the dead counter
         end
-        internal_dead = internal_dead-dead -- Subtract the input 
-        local s_groups = {} -- Create table for groups, sorted by priority
-        s_groups[#s_groups+1] = groups[1] -- Add the first group to start sorting
-        for i = 2, #groups do -- For each group other than that one
-            for j = 1, #s_groups do -- Iterate over the sorted groups
-                if groups[i].priority < s_groups[j].priority then -- If the priority of the current unsorted group is less than the value of the current sorted group
-                    table.insert(s_groups, j, groups[i]) -- Insert it such that it will go before the sorted group in the sorted table
-                    break -- Break out of the checking
-                elseif j == #s_groups then -- OTHERWISE if this is the last iteration
-                    s_groups[#s_groups+1] = groups[i] -- Tack the unsorted group onto the end of the sorted table
-                end
-            end
-        end
-        for _, group in pairs(s_groups) do -- For each group
-            local threads = group.threads -- Make the current groups threads more accessible
-            local s_threads = {} -- Sort threads
-            if #threads > 0 then -- If there is at least one thread
-                s_threads[#s_threads+1] = threads[1] -- Allocate the first thread to teh sorted table
-                for i = 2, #threads do -- For each thread other than that one
-                    for j = 1, #s_threads do -- Scan the sorted table
-                        if threads[i].priority < s_threads[j].priority then -- If the priority of the current unsorted thread is less than the value of the current sorted thread
-                            table.insert(s_threads, j, threads[i]) -- Insert it such that it will go before the sorted thread in the sorted table
-                            break -- Break out of checking
-                        elseif j == #s_threads then -- OTHERWISE if this is the last iteration
-                            s_threads[#s_threads+1] = threads[i] -- Take the unsorted thread onto the end of the sorted table
-                        end
-                    end
-                end
-            end
-            if group.enabled then -- If the group is enabled
-                for _, thread in pairs(s_threads) do -- For each sorted thread
-                    if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then -- ok we're putting this on the next line, there's a lot going on here.
+        internal_dead = internal_dead-dead
+        local s_groups = sort(groups) -- Sort groups by priority
+        for i = 1, #s_groups do -- For each group
+            local s_threads = sort(s_groups[i].threads) -- Sort threads by priority
+            if s_groups[i].enabled then -- If the group is enabled
+                for j = 1, #s_threads do -- For each sorted thread
+                    local thread = s_threads[j]
+                    if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then 
+                    -- There's a lot going on here, a newline was a must.
                     -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected, or equal to terminate
-                        local event = nil -- Target event
+                        local event
                         while #thread.queue ~= 0 do -- until the queue is empty
                             if event == nil or event == thread.queue[1][1] then -- If the target event is nil or equal to what's in the queue
-                                local suc, err = coroutine.resume(thread.coro, unpack(thread.queue[1])) -- Resume the coroutine, and give the event
-                                if suc then -- If execution was successful
-                                    event = err -- The target event is set to the err value
-                                end
-                                assert(suc, err) -- If the coroutine wasn't successful, error
+                                event = resume(thread.coro, thread.queue[1])
                             end
-                            table.remove(thread.queue, 1) -- Remove the event from the queue
+                            table.remove(thread.queue, 1)
                         end
-                        local suc, err = coroutine.resume(thread.coro, unpack(e)) -- Resume the coroutine with the current event
-                        if suc then -- If that was successful
-                            thread.event = err -- set the event the thread desires next
-                        end
-                        assert(suc, err) -- If it was unsuccessful throw the error
-                    elseif not (thread.enabled or coroutine.status(thread.coro) ~= "dead") then -- OTHERWISE if the thread isn't enabled and isn't dead add the event to the thread queue
+                        thread.event = resume(thread.coro, e)
+                    elseif not thread.enabled then -- OTHERWISE if the thread isn't enabled and isn't dead add the event to the thread queue
                         thread.queue[#thread.queue+1] = e
                     end
-                    if coroutine.status(thread.coro) == "dead" and thread.enabled ~= false then -- If the thread is dead and not disabled
-                        cur_dead = cur_dead+1 -- Add one to the current dead counter
-                        thread.enabled = false -- Disable the thread
+                    if coroutine.status(thread.coro) == "dead" then
+                        cur_dead = cur_dead+1
+                        for k = 1, #groups[i].threads do -- Search for the thread to remove
+                            if groups[i].threads[k] == thread then
+                                table.remove(groups[i].threads[k])
+                                break
+                            end
+                        end
                     end
+                end
+            else
+                for j = 1, #s_groups[i].threads do
+                    local thread = s_groups[i].threads[j]
+                    thread.queue[#thread.queue+1] = e
                 end
             end
         end
@@ -233,19 +150,15 @@ local runInternal = function(groups, dead) -- Function to execute thread managem
 end
 
 this.manager.runGroup = function(group, dead) -- Function to execute thread management for a single group
-    assert(type(group) == "number", "Invalid argument #1 (number expected, got "..type(group)..")") -- If the first argument wasn't a number
-    assert(groups[group], "Invalid argument #1 (group [ID: "..group.."] does not exist)") -- If the first argument wasn't a valid group ID
-    res = runInternal({groups[group]}, dead)
+    assert(isgroup(group), "Invalid argument #1 (valid group expected)")
+    res = runInternal({group}, dead)
     groups[group].enabled = false
     return res
 end
 
 this.manager.run = function(dead) -- Function to execute thread management for all groups
-    local grps = {}
-    for i = 0, #groups do
-        grps[i+1] = groups[i]
-    end
-    return runInternal(grps, dead)
+    return runInternal(groups, dead)
 end
 
+this.group() -- Add a master group
 return this -- Return the API
