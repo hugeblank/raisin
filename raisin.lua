@@ -75,7 +75,6 @@ local runInternal = function(groups, dead) -- Function to execute thread managem
     if not dead or dead < 0 then
         dead = 0
     end
-    local cur_dead = 0 -- Set a current value for dead coroutines
     local function sort(unsorted)
         local sorted = {}
         sorted[#sorted+1] = unsorted[1] -- Add the first item to start sorting
@@ -100,7 +99,7 @@ local runInternal = function(groups, dead) -- Function to execute thread managem
     end
     local e = {} -- Event variable
     while true do -- Begin thread management
-        local internal_dead = 0 -- Set a value to update per loop so added threads that immediately die aren't factored
+        local internal_dead = 0-- Set a value to update per loop so added threads that immediately die aren't factored
         for i = 1, #groups do -- For each group
             internal_dead = internal_dead+#groups[i].threads -- Add the amount of threads in the group(s) to the dead counter
         end
@@ -114,10 +113,9 @@ local runInternal = function(groups, dead) -- Function to execute thread managem
                     if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then 
                     -- There's a lot going on here, a newline was a must.
                     -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected, or equal to terminate
-                        local event
                         while #thread.queue ~= 0 do -- until the queue is empty
-                            if event == nil or event == thread.queue[1][1] then -- If the target event is nil or equal to what's in the queue
-                                event = resume(thread.coro, thread.queue[1])
+                            if thread.event == nil or thread.event == thread.queue[1][1] then -- If the target event is nil or equal to what's in the queue
+                                thread.event = resume(thread.coro, thread.queue[1])
                             end
                             table.remove(thread.queue, 1)
                         end
@@ -126,10 +124,10 @@ local runInternal = function(groups, dead) -- Function to execute thread managem
                         thread.queue[#thread.queue+1] = e
                     end
                     if coroutine.status(thread.coro) == "dead" then
-                        cur_dead = cur_dead+1
                         for k = 1, #groups[i].threads do -- Search for the thread to remove
                             if groups[i].threads[k] == thread then
-                                table.remove(groups[i].threads[k])
+                                internal_dead = internal_dead-1 -- Subtract one so living value is current
+                                table.remove(groups[i].threads, k)
                                 break
                             end
                         end
@@ -142,7 +140,7 @@ local runInternal = function(groups, dead) -- Function to execute thread managem
                 end
             end
         end
-        if cur_dead >= internal_dead then -- If dead isn't 0 and the current dead is larger or equal to the target amount
+        if internal_dead <= 0 then -- If dead isn't 0 and the current dead is larger or equal to the target amount
             break -- Get out of the main loop
         end
         e = {os.pullEventRaw()} -- Pull a raw event, package it immediately
