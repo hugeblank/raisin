@@ -9,9 +9,7 @@ Currently the only installation method is directly downloading the file/repo:
 
 ```wget https://raw.githubusercontent.com/hugeblank/raisin/master/raisin.lua```
 
-Depending on how well recieved this is (as if XP) I may make it a luarocks package.
-
 # Examples & Documentation
 Documentation can be found on the wiki, located [here](https://github.com/hugeblank/raisin/wiki)
 
-Examples are offered at [this](https://github.com/hugeblank/raisin-demos) repository. If you have further demonstrations, or a better example of what is already provided please make a pull request, contribution is welcome!
+Examples are offered (for ComputerCraft) at [this](https://github.com/hugeblank/raisin-demos) repository. If you have further demonstrations, or a better example of what is already provided please make a pull request, contribution is welcome!

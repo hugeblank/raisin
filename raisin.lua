@@ -23,9 +23,11 @@ local assert = function(condition, message, level) -- Local assert function that
 end
 
 local isgroup = function(group)
-    for i = 1, #groups do
-        if group == groups[i].instance then
-            return groups[i]
+    if group then
+        for i = 1, #groups do
+            if group == groups[i].instance then
+                return groups[i]
+            end
         end
     end
     return false
@@ -59,10 +61,11 @@ end
 
 this.thread = function(func, priority, group) -- Function for thread adding
     priority = priority or 0
-    group = isgroup(group or groups[1].instance)
     assert(type(func) == "function", "Invalid argument #1 (function expected, got "..type(func)..")")
     assert(type(priority) == "number", "Invalid argument #2 (number expected, got "..type(priority)..")")
-    assert(group, "Invalid argument #3 (valid group expected)")
+    local temp = isgroup(group)
+    assert(temp or group == nil, "Invalid argument #3 (valid group expected, got "..type(group)..")")
+    group = temp or groups[1]
     func = coroutine.create(func) -- Create a coroutine out of the function
     local internal = {coro = func, queue = {}, priority = priority, enabled = true, event = nil}
     internal.instance = interface(internal)
@@ -70,7 +73,8 @@ this.thread = function(func, priority, group) -- Function for thread adding
     return internal.instance
 end
 
-local runInternal = function(groups, dead) -- Function to execute thread management
+local runInternal = function(listener, groups, dead) -- Function to execute thread management
+    assert(type(listener) == "function", "Invalid argument #1 (function expected, got "..type(listener)..")", 1)
     assert(dead == nil or type(dead) == "number", "Invalid argument #1 (number expected, got "..type(dead)..")", 1)
     if not dead or dead < 0 then
         dead = 0
@@ -110,7 +114,7 @@ local runInternal = function(groups, dead) -- Function to execute thread managem
             if s_groups[i].enabled then -- If the group is enabled
                 for j = 1, #s_threads do -- For each sorted thread
                     local thread = s_threads[j]
-                    if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then 
+                    if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1]) then 
                     -- There's a lot going on here, a newline was a must.
                     -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected, or equal to terminate
                         while #thread.queue ~= 0 do -- until the queue is empty
@@ -143,20 +147,20 @@ local runInternal = function(groups, dead) -- Function to execute thread managem
         if internal_dead <= 0 then -- If dead isn't 0 and the current dead is larger or equal to the target amount
             break -- Get out of the main loop
         end
-        e = {os.pullEventRaw()} -- Pull a raw event, package it immediately
+        e = {listener()} -- Pull a raw event, package it immediately
     end
 end
 
-this.manager.runGroup = function(group, dead) -- Function to execute thread management for a single group
+this.manager.runGroup = function(listener, group, dead) -- Function to execute thread management for a single group
     group = isgroup(group)
     assert(group, "Invalid argument #1 (valid group expected)")
-    res = runInternal({group}, dead)
+    res = runInternal(listener, {group}, dead)
     group.enabled = false
     return res
 end
 
-this.manager.run = function(dead) -- Function to execute thread management for all groups
-    return runInternal(groups, dead)
+this.manager.run = function(listener, dead) -- Function to execute thread management for all groups
+    return runInternal(listener, groups, dead)
 end
 
 this.group() -- Add a master group
