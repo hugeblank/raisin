@@ -47,6 +47,26 @@ local interface = function(internal)
         setPriority = function(value)
             assert(type(value) == "number", "Invalid argument #1 (number expected, got "..type(value)..")")
             internal.priority = value
+        end,
+        remove = function()
+                -- Scan groups
+                for i = 1, #groups do
+                    if groups[i] == internal then
+                        table.remove(groups, i)
+                        return true
+                    end
+                end
+                -- Scan threads
+                for i = 1, #groups do
+                    local threads = groups[i].threads
+                    for j = 1, #threads do
+                        if threads[j] == internal then
+                            table.remove(groups[i].threads, j)
+                            return true
+                        end
+                    end
+                end
+            return false
         end
     }
 end
