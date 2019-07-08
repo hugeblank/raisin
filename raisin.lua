@@ -1,5 +1,5 @@
 --[[ Raisin by Hugeblank
-    This code is my property, but I will let you use it so long as you don't redistribute this manager for
+    This code is my own, but I will let you use it so long as you don't redistribute this manager for
     monetary gain and leave this comment block untouched. Add/remove code as you wish. Should you decide to freely
     distribute with additional modifications, please credit yourself. :)
     
@@ -114,17 +114,15 @@ local runInternal = function(listener, groups, dead) -- Function to execute thre
         end
         return sorted
     end
-    local function resume(coro, event)
+    local function resume(coro, event) -- General function to resume a coroutine with the following event
         local suc, err = coroutine.resume(coro, table.unpack(event))
-        assert(suc, err, 1)
-        if suc then
-            return err    
-        end
+        assert(suc, err, 1) -- Crash and burn if the coroutine crashed
+        return err -- Return the event filter
     end
     local e = {} -- Event variable
     local static, static_dead = {}, 0
     for i = 1, #groups do -- For each group
-        for j = 1, #groups[i].threads do
+        for j = 1, #groups[i].threads do -- Save as a static thread
             static[#static+1] = groups[i].threads[j]
         end
     end
@@ -137,7 +135,7 @@ local runInternal = function(listener, groups, dead) -- Function to execute thre
                     local thread = s_threads[j]
                     if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1]) then 
                     -- There's a lot going on here, a newline was a must.
-                    -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected THEN
+                    -- If the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected THEN
                         while #thread.queue ~= 0 do -- until the queue is empty
                             if thread.event == nil or thread.event == thread.queue[1][1] then -- If the target event is nil or equal to what's in the queue
                                 thread.event = resume(thread.coro, thread.queue[1])
@@ -145,34 +143,34 @@ local runInternal = function(listener, groups, dead) -- Function to execute thre
                             table.remove(thread.queue, 1)
                         end
                         thread.event = resume(thread.coro, e)
-                    elseif not thread.enabled then -- OTHERWISE if the thread isn't enabled and isn't dead add the event to the thread queue
+                    elseif not thread.enabled then -- OTHERWISE if the thread isn't enabled add the event to the thread queue
                         thread.queue[#thread.queue+1] = e
                     end
                     if coroutine.status(thread.coro) == "dead" then
                         for k = 1, #groups[i].threads do -- Search for the thread to remove
-                            if groups[i].threads[k] == thread then
-                                for l = 1, #static do
-                                    if static[l] == thread then
-                                        static_dead = static_dead+1
+                            if groups[i].threads[k] == thread then -- Find the thread in the groups table
+                                for l = 1, #static do -- For each thread that was made BEFORE the manager was executed
+                                    if static[l] == thread then -- If this dead one is a static thread
+                                        static_dead = static_dead+1 -- Add it to the dead list
                                     end
                                 end
-                                table.remove(groups[i].threads, k)
+                                table.remove(groups[i].threads, k) -- Remove the thread from execution
                                 break
                             end
                         end
                     end
                 end
-            else
-                for j = 1, #s_groups[i].threads do
+            else -- OTHERWISE
+                for j = 1, #s_groups[i].threads do -- For each thread in this group
                     local thread = s_groups[i].threads[j]
-                    thread.queue[#thread.queue+1] = e
+                    thread.queue[#thread.queue+1] = e -- Add the event to its own queue
                 end
             end
         end
         if static_dead >= dead and dead > 0 then
-            break
+            return
         end
-        e = {listener()} -- Pull a raw event, package it immediately
+        e = {listener()} -- package whatever listener returns
     end
 end
 
@@ -180,7 +178,6 @@ this.manager.runGroup = function(listener, group, dead) -- Function to execute t
     group = isgroup(group)
     assert(group, "Invalid argument #1 (valid group expected)")
     res = runInternal(listener, {group}, dead)
-    group.enabled = false
     return res
 end
 
