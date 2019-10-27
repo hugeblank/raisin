@@ -97,6 +97,10 @@ local runInternal = function(groups, dead) -- Function to execute thread managem
             return err    
         end
     end
+
+    local halt = false
+    this.manager.halt = function(val) if not val then halt = not halt else halt = val and true end end
+
     local e = {} -- Event variable
     local origin = {}
     local totalDead = 0
@@ -112,7 +116,7 @@ local runInternal = function(groups, dead) -- Function to execute thread managem
             if s_groups[i].enabled then -- If the group is enabled
                 for j = 1, #s_threads do -- For each sorted thread
                     local thread = s_threads[j]
-                    if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then 
+                    if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1] or e[1] == "terminate") then
                     -- There's a lot going on here, a newline was a must.
                     -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected, or equal to terminate
                         while #thread.queue ~= 0 do -- until the queue is empty
@@ -130,6 +134,7 @@ local runInternal = function(groups, dead) -- Function to execute thread managem
                             if groups[i].threads[k] == thread then
                                 for l = 1, #origin do
                                     if groups[i].threads[k] == origin[l] then
+                                        table.remove(origin, l)
                                         totalDead = totalDead + 1
                                     end
                                 end
@@ -146,7 +151,8 @@ local runInternal = function(groups, dead) -- Function to execute thread managem
                 end
             end
         end
-        if totalDead >= dead then -- If dead isn't 0 and the current dead is larger or equal to the target amount
+        if (totalDead >= dead and dead > 0) or #origin == 0 or halt then -- Check exit condition
+            this.manager.halt = nil
             break -- Get out of the main loop
         end
         e = {os.pullEventRaw()} -- Pull a raw event, package it immediately
