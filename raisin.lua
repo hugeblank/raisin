@@ -14,7 +14,7 @@ return {
     manager = function(listener)
         local this = {}
 
-        local groups = {} -- instantiate the groups table, the mother of Raisin.
+        local groups = {} -- instantiate the groups table
 
         local assert = function(condition, message, level) -- Local assert function that has a third parameter so that you can set the level of the error
             if not condition then -- If the condition is not met
@@ -25,7 +25,7 @@ return {
 
         assert(type(listener) == "function", "Invalid argument #1 (function expected, got "..type(listener)..")", -1)
 
-        local isgroup = function(group)
+        local isgroup = function(group) -- Determine whether the object given is a thread or group
             for i = 1, #groups do
                 if group == groups[i].instance then
                     return groups[i]
@@ -39,7 +39,7 @@ return {
             if not dead or dead < 0 then
                 dead = 0
             end
-            local function sort(unsorted)
+            local function sort(unsorted) -- TODO: Not use such a garbage sorting method
                 local sorted = {}
                 sorted[#sorted+1] = unsorted[1] -- Add the first item to start sorting
                 for i = 2, #unsorted do -- For each item other than that one
@@ -54,7 +54,7 @@ return {
                 end
                 return sorted
             end
-            local function resume(coro, event)
+            local function resume(coro, event) -- Simple coroutine resume wrapper
                 local suc, err = coroutine.resume(coro, table.unpack(event))
                 assert(suc, err, 1)
                 if suc then
@@ -62,7 +62,7 @@ return {
                 end
             end
 
-            local halt = false
+            local halt = false -- Enabling halt function access
             this.halt = function(val) if not val then halt = not halt else halt = val and true end end
 
             local e = {} -- Event variable
@@ -85,18 +85,18 @@ return {
                             -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected, or equal to terminate
                                 while #thread.queue ~= 0 do -- until the queue is empty
                                     if thread.event == nil or thread.event == thread.queue[1][1] then -- If the target event is nil or equal to what's in the queue
-                                        thread.event = resume(thread.coro, thread.queue[1])
+                                        thread.event = resume(thread.coro, thread.queue[1]) -- Process the queued event
                                     end
-                                    table.remove(thread.queue, 1)
+                                    table.remove(thread.queue, 1) -- Remove that event from the queue
                                 end
-                                thread.event = resume(thread.coro, e)
+                                thread.event = resume(thread.coro, e) -- Process latest event
                             elseif not thread.enabled then -- OTHERWISE if the thread isn't enabled and isn't dead add the event to the thread queue
                                 thread.queue[#thread.queue+1] = e
                             end
                             if coroutine.status(thread.coro) == "dead" then
                                 for k = 1, #groups[i].threads do -- Search for the thread to remove
-                                    if groups[i].threads[k] == thread then
-                                        for l = 1, #origin do
+                                    if groups[i].threads[k] == thread then 
+                                        for l = 1, #origin do -- Check if this thread was an original one
                                             if groups[i].threads[k] == origin[l] then
                                                 table.remove(origin, l)
                                                 totalDead = totalDead + 1
@@ -108,37 +108,37 @@ return {
                                 end
                             end
                         end
-                    else
-                        for j = 1, #s_groups[i].threads do
+                    else -- OTHERWISE
+                        for j = 1, #s_groups[i].threads do -- Queue the event to all threads in this group
                             local thread = s_groups[i].threads[j]
                             thread.queue[#thread.queue+1] = e
                         end
                     end
                 end
                 if (totalDead >= dead and dead > 0) or #origin == 0 or halt then -- Check exit condition
-                    this.halt = nil
+                    this.halt = nil -- Clear access to the halt function
                     break -- Get out of the main loop
                 end
                 e = {listener()} -- Pull a raw event, package it immediately
             end
         end
 
-        local interface = function(internal)
+        local interface = function(internal) -- General interface used for both groups and threads
             return {
-                state = function()
+                state = function() -- Whether the object is processing events/buffering them
                     return internal.enabled
                 end,
-                toggle = function(value)
+                toggle = function(value) -- Toggle processing/buffering of events
                     internal.enabled = value or not internal.enabled
                 end,
-                getPriority = function()
+                getPriority = function() -- Get the current priority of the object
                     return internal.priority
                 end,
-                setPriority = function(value)
+                setPriority = function(value) -- Set the current priority of the object
                     assert(type(value) == "number", "Invalid argument #1 (number expected, got "..type(value)..")")
                     internal.priority = value
                 end,
-                remove = function()
+                remove = function() -- Remove the object from execution immediately
                     -- Scan groups
                     for i = 1, #groups do
                         if groups[i] == internal then
@@ -156,12 +156,12 @@ return {
                             end
                         end
                     end
-                    return false
+                    return false -- Object cannot be found
                 end
             }
         end
 
-        this.group = function(priority)
+        this.group = function(priority) -- Initialize a group
             priority = priority or 0
             local internal = {threads = {}, priority = priority, enabled = true}
             internal.instance = interface(internal)
@@ -175,7 +175,7 @@ return {
             return internal.instance
         end
 
-        this.thread = function(func, priority, group) -- Function for thread adding
+        this.thread = function(func, priority, group) -- Initialize a thread
             priority = priority or 0
             group = isgroup(group or groups[1].instance)
             assert(type(func) == "function", "Invalid argument #1 (function expected, got "..type(func)..")")
