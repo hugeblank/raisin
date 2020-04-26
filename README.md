@@ -5,9 +5,17 @@ As is evident Raisin is designed for lua's coroutines to allow for many freedoms
 
 # Installation
 
-Currently the only installation method is directly downloading the file/repo:
+You can install through LuaRocks:
 
-```wget https://raw.githubusercontent.com/hugeblank/raisin/master/raisin.lua```
+```
+$ luarocks install raisin
+```
+
+Or you can directly download the file/repo:
+
+```
+$ wget https://raw.githubusercontent.com/hugeblank/raisin/master/raisin.lua
+```
 
 # Examples & Documentation
 Documentation can be found on the wiki, located [here](https://github.com/hugeblank/raisin/wiki)
