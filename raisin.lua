@@ -55,7 +55,7 @@ return {
                 return sorted
             end
             local function resume(coro, event) -- Simple coroutine resume wrapper
-                local suc, err = coroutine.resume(coro, table.unpack(event))
+                local suc, err = coroutine.resume(coro, table.unpack(event, 1, event.n))
                 assert(suc, err, 1)
                 if suc then
                     return err
@@ -119,7 +119,7 @@ return {
                     this.halt = nil -- Clear access to the halt function
                     break -- Get out of the main loop
                 end
-                e = {listener()} -- Pull a raw event, package it immediately
+                e = table.pack(listener()) -- Pull a raw event, package it immediately
             end
         end
 
