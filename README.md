@@ -1,7 +1,7 @@
 # Raisin | Threads made easy
-Raisin is a priority based coroutine manager with a few additional twists. Its name in its prototyping stage was originally 'ryzen', the joke being that it was a 'threadripper'. Obviously that name is a poor choice, so something similar was decided upon.
+Raisin is a priority based coroutine manager with a few additional twists. Its name in its prototyping stage was originally 'ryzen', the joke being that it was a 'threadripper'. Since ryzen had bad SEO, something similar was decided upon. 
 
-As is evident Raisin is designed for lua's coroutines to allow for many freedoms, such as manual prioritization, grouping, toggling, and a manual coroutine death termination amount. 
+Raisin is designed for lua's coroutines to allow for many freedoms, such as manual prioritization, grouping, toggling, and a manual coroutine death termination amount.
 
 # Installation
 
@@ -11,7 +11,7 @@ You can install through LuaRocks:
 $ luarocks install raisin
 ```
 
-Or you can directly download the file/repo:
+Or directly download the file/repo:
 
 ```
 $ wget https://raw.githubusercontent.com/hugeblank/raisin/master/raisin.lua
