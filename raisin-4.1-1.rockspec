@@ -1,5 +1,5 @@
 package = "raisin"
-version = "4.0-1"
+version = "4.1-1"
 description = {
   summary = "Threads made easy",
   detailed = [[
@@ -14,7 +14,7 @@ description = {
 }
 source = {
   url = "git://github.com/hugeblank/raisin.git",
-  tag = "v4.0",
+  tag = "v4.1",
 }
 build = {
   type = "builtin",

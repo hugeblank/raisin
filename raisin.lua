@@ -9,6 +9,19 @@
     Demonstrations of the library can also be found at:
     `https://github.com/hugeblank/raisin-demos`
 ]]
+
+local function copy(t)
+    local out = {}
+    for k, v in pairs(t) do
+        if type(v) == "table" then
+            out[k] = copy(v)
+        else
+            out[k] = v
+        end
+    end
+    return out
+end
+
 local function manager(listener)
     local this = {} -- Thread/group creation and runner
 
@@ -47,6 +60,11 @@ local function manager(listener)
         end
     end
 
+    local function check(thread, name)
+        return thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == name)
+        -- If the thread is enabled, and the thread is suspended and there either isn't a target event, or it's equal to the event detected
+    end
+
     this.run = function(onDeath) -- Function to execute thread managment
         assert(type(onDeath) == "function", "Invalid argument #1 (function expected, got "..type(onDeath)..")")
 
@@ -62,45 +80,73 @@ local function manager(listener)
             local total = #s_threads
             for j = 1, total do -- For each sorted thread
                 local thread = s_threads[j]
-                if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == e[1]) then
-                -- There's a lot going on here, a newline was a must.
-                -- If the group is enabled and the thread is enabled, and the thread is suspended and the target event is either nil, or equal to the event detected, or equal to terminate
-                    while #thread.queue ~= 0 do -- until the queue is empty
-                        if thread.enabled and coroutine.status(thread.coro) == "suspended" and (thread.event == nil or thread.event == thread.queue[1][1]) then
-                            -- This line looks awfully familiar...
-                            -- Factors in threads that self disable.
-                            thread.event = resume(thread, thread.queue[1]) -- Process the queued event
-                        end
-                        table.remove(thread.queue, 1) -- Remove that event from the queue
+                while #thread.queue ~= 0 do -- until the queue is empty
+                    if check(thread, thread.queue[1][1]) then
+                        thread.event = resume(thread, thread.queue[1]) -- Process the queued event
                     end
+                    table.remove(thread.queue, 1) -- Remove that event from the queue
+                end
+                if check(thread, e[1]) then
                     thread.event = resume(thread, e) -- Process latest event
-                elseif not thread.enabled then -- OTHERWISE if the thread isn't enabled and isn't dead add the event to the thread queue
-                    thread.queue[#thread.queue+1] = e
+                elseif not thread.enabled then
+                    -- OTHERWISE if the thread isn't enabled and the event type is allowed to be cached, add the event to the thread queue
+                    if thread.filter and thread.filter[(e[1])] then
+                        -- If there's a queue filter, and the event is in the filter then queue it
+                        thread.queue[#thread.queue+1] = e
+                    elseif not thread.filter then
+                        -- If there isn't a thread filter then just queue it (backwards compat)
+                        thread.queue[#thread.queue+1] = e
+                    end
                 end
                 if coroutine.status(thread.coro) == "dead" then
                     local living = {} -- All living thread instances
-                    for i = 1, #threads do
-                        living[i] = threads[i].instance
-                    end
-                    for k = 1, #s_threads do -- Search for the thread to remove
-                        if s_threads[k] == thread then
-                            table.remove(s_threads, k)
-                            j, total = j-1, total-1
+                    for k = 1, #threads do -- Search for the thread to remove
+                        if threads[k] == thread then
+                            table.remove(threads, k)
+                            j = j-1
                             break
                         end
+                    end
+                    for i = 1, #threads do
+                        living[i] = threads[i].instance
                     end
                     local err
                     err, halt = pcall(onDeath, thread.instance, living, initial) -- Trigger user defined onDeath function to determine whether to halt execution
                     assert(err, halt, 1) -- If the onDeath function errors announce that
                     if halt then return end
                 end
+                total = #s_threads
             end
             e = table.pack(listener()) -- Pull a raw event, package it immediately
         end
     end
 
-    local interface = function(internal) -- General interface used for both groups and threads
-        return {
+    local interface = function(coro, priority, filter) -- General interface used for both groups and threads
+        priority = priority or 0
+        filter = filter or {}
+        if type(filter) == "string" then
+            filter = {[filter] = true}
+        end
+        assert(type(priority) == "number", "Invalid argument #2 (number expected, got "..type(priority)..")", 1)
+        assert(type(filter) == "table", "Invalid argument #3 (table or string expected, got "..type(filter)..")", 1)
+        if #filter == 0 then
+            filter = nil
+        else
+            filter = copy(filter)
+            for i = 1, #filter do
+                filter[(filter[i])] = true
+                filter[i] = nil
+            end
+        end
+        local internal = {
+            coro = coro,
+            queue = {},
+            filter = filter,
+            priority = priority,
+            enabled = true,
+            event = nil
+        }
+        internal.instance = {
             state = function() -- Whether the object is processing events/buffering them
                 return internal.enabled
             end,
@@ -124,44 +170,23 @@ local function manager(listener)
                 return false -- Object cannot be found
             end
         }
+        threads[#threads+1] = internal
+        return internal.instance
     end
 
-    this.thread = function(func, priority) -- Initialize a thread
-        priority = priority or 0
+    this.thread = function(func, ...) -- Initialize a thread
         assert(type(func) == "function", "Invalid argument #1 (function expected, got "..type(func)..")")
-        assert(type(priority) == "number", "Invalid argument #2 (number expected, got "..type(priority)..")")
-        local internal = {
-            coro = coroutine.create(func), -- Create a coroutine out of the function
-            queue = {},
-            priority = priority,
-            enabled = true,
-            event = nil
-        }
-        internal.instance = interface(internal)
-        threads[#threads+1] = internal
-        return internal.instance
+        return interface(coroutine.create(func), ...)
     end
 
-    this.group = function(onDeath, priority) -- Initialize a group
+    this.group = function(onDeath, ...) -- Initialize a group
         assert(type(onDeath) == "function", "Invalid argument #1 (function expected, got "..type(onDeath)..")")
-        assert(type(priority) == "number" or type(priority) == nil, "Invalid argument #2 (number expected, got "..type(priority)..")")
-        priority = priority or 0
         local subman = manager(listener)
-        local internal = {
-            coro = coroutine.create(function() subman.run(onDeath) end),
-            queue = {},
-            priority = priority,
-            enabled = true,
-            event = nil
-        }
-        internal.instance = interface(internal)
-
-        internal.instance.run = subman.run
-        internal.instance.thread = subman.thread
-        internal.instance.group = subman.group
-
-        threads[#threads+1] = internal
-        return internal.instance
+        local ii = interface(coroutine.create(function() subman.run(onDeath) end), ...)
+        ii.run = subman.run
+        ii.thread = subman.thread
+        ii.group = subman.group
+        return ii
     end
 
     this.onDeath = {-- Template thread/group death handlers
