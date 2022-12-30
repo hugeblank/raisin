@@ -200,7 +200,7 @@ local function manager(listener)
             local amt = 0
             return function()
                 amt = amt+1
-                return amt == n
+                return amt >= n
             end
         end,
         waitForAllInitial = function() -- Wait for all threads created before runtime to die
@@ -209,7 +209,6 @@ local function manager(listener)
                     if init[i] == dead then
                         table.remove(init, i)
                     end
-                    break
                 end
                 return #init == 0
             end
@@ -222,9 +221,8 @@ local function manager(listener)
                     if init[i] == dead then
                         amt = amt+1
                     end
-                    break
                 end
-                return amt == n
+                return amt >= n
             end
         end,
         -- The following "waitForXRuntime" functions assume that runtime threads were created before any initial thread died
@@ -258,7 +256,7 @@ local function manager(listener)
                     end
                 end
                 amt = amt+1
-                return n == amt
+                return n >= amt
             end
         end
     }
