@@ -1,7 +1,4 @@
 --[[ Raisin by Hugeblank
-    This code is my property, but I will let you use it so long as you don't redistribute this manager for
-    monetary gain and leave this comment block untouched. Add/remove code as you wish. Should you decide to freely
-    distribute with additional modifications, please credit yourself. :)
 
     Raisin can be found on github at:
     `https://github.com/hugeblank/raisin`
